@@ -1,0 +1,50 @@
+name: Build LineageOS 19.1 for Xperia Z2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev
+
+      - name: Configure git
+        run: |
+          git config --global user.name "danialbaradarandev"
+          git config --global user.email "danialbaradaran20@gmail.com"
+
+      - name: Initialize repo and sync source
+        run: |
+          mkdir -p ~/android/lineage
+          cd ~/android/lineage
+          repo init -u https://github.com/LineageOS/android.git -b lineage-19.1
+          repo sync -c -j4 --force-sync --no-clone-bundle --no-tags
+
+      - name: Clone device tree and vendor blobs
+        run: |
+          cd ~/android/lineage
+          git clone https://github.com/LineageOS/android_device_sony_sirius device/sony/sirius
+          git clone https://github.com/LineageOS/android_device_sony_shinano-common device/sony/shinano-common
+          git clone https://github.com/TheMuppets/proprietary_vendor_sony_sirius vendor/sony/sirius
+          git clone https://github.com/TheMuppets/proprietary_vendor_sony_shinano-common vendor/sony/shinano-common
+
+      - name: Setup build environment
+        run: |
+          cd ~/android/lineage
+          source build/envsetup.sh
+          lunch lineage_sirius-userdebug
+
+      - name: Build ROM
+        run: |
+          cd ~/android/lineage
+          mka bacon
+
+      - name: Upload ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: lineage-19.1-z2
+          path: ~/android/lineage/out/target/product/sirius/*.zip
