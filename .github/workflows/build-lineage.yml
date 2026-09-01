@@ -10,7 +10,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses6-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev
+          sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev libc6-dev-i386 lib32ncurses6-dev lib32z1-dev lib32gcc-s1 lib32gcc-12-dev libx11-dev libx11-dev:i386 libreadline6-dev libxml2-dev libgl1-mesa-dev libssl-dev libncurses-dev x11proto-core-dev python3 python3-pip openjdk-17-jdk android-sdk-platform-tools adb fastboot bc bison ccache repo cpio pngcrush rsync schedtool squashfs-tools texinfo unzip xsltproc zip zlib1g-dev
 
       - name: Configure git
         run: |
