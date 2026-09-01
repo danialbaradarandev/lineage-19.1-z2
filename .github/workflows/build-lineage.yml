@@ -22,20 +22,31 @@ jobs:
           mkdir -p ~/android/lineage
           cd ~/android/lineage
           repo init -u https://github.com/LineageOS/android.git -b lineage-19.1
-          repo sync -c -j4 --force-sync --no-clone-bundle --no-tags
+          repo sync -c -j8 --force-sync --no-clone-bundle --no-tags
 
-      - name: Clone device tree and vendor blobs
+      - name: Clone device tree, vendor blobs and kernel
         run: |
           cd ~/android/lineage
-          git clone https://github.com/LineageOS/android_device_sony_sirius device/sony/sirius
-          git clone https://github.com/LineageOS/android_device_sony_shinano-common device/sony/shinano-common
-          git clone https://github.com/TheMuppets/proprietary_vendor_sony_sirius vendor/sony/sirius
-          git clone https://github.com/TheMuppets/proprietary_vendor_sony_shinano-common vendor/sony/shinano-common
+          # Device Tree (Sirius)
+          git clone https://github.com/LineageOS/android_device_sony_sirius device/sony/sirius || \
+          git clone https://github.com/sonyxperiadev/device-sony-sirius device/sony/sirius
+
+          # Common Device Tree (Shinano)
+          git clone https://github.com/LineageOS/android_device_sony_shinano-common device/sony/shinano-common || \
+          git clone https://github.com/sonyxperiadev/device-sony-shinano-common device/sony/shinano-common
+
+          # Vendor Blobs (Secure and actively maintained)
+          git clone https://github.com/foric/proprietary_vendor_sony vendor/sony
+
+          # Kernel (msm8974 for Xperia Z2)
+          git clone https://github.com/LineageOS/android_kernel_sony_msm8974 kernel/sony/msm8974 || \
+          git clone https://github.com/sonyxperiadev/kernel-sony-msm8974 kernel/sony/msm8974
 
       - name: Setup build environment
         run: |
           cd ~/android/lineage
           source build/envsetup.sh
+          breakfast sirius
           lunch lineage_sirius-userdebug
 
       - name: Build ROM
