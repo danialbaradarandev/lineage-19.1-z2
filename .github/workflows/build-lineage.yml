@@ -1,130 +1,116 @@
-name: Build LineageOS 19.1 - Sony Xperia Z2
+name: Build postmarketOS for Xperia Z2 (sony-sirius)
 
 on:
   workflow_dispatch:
+    inputs:
+      device:
+        description: 'کدنیم دستگاه در pmaports'
+        required: true
+        default: 'sony-sirius'
+      ui:
+        description: 'رابط کاربری (none / x11 / weston / phosh / plasma-mobile ...)'
+        required: true
+        default: 'weston'
+      channel:
+        description: 'برنچ pmaports (معمولاً edge)'
+        required: true
+        default: 'master'
+      patches_dir:
+        description: 'پوشه‌ی پچ‌های اختیاری داخل همین ریپو (خالی = بدون پچ)'
+        required: false
+        default: 'patches'
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 360
+    runs-on: ubuntu-latest
+    timeout-minutes: 340   # به سقف ۶ ساعته‌ی رانر رایگان نزدیک نشیم
 
     steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          df -h
+      - name: Checkout ریپوی خودمون (پچ‌های اختیاری)
+        uses: actions/checkout@v4
+        with:
+          path: workflow-src
 
-      - name: Install dependencies
+      - name: نصب پیش‌نیازهای pmbootstrap
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git-core \
-            gnupg \
-            flex \
-            bison \
-            build-essential \
-            zip \
-            curl \
-            zlib1g-dev \
-            libc6-dev-i386 \
-            libncurses5 \
-            x11proto-core-dev \
-            libx11-dev \
-            libreadline-dev \
-            libgl1-mesa-dev \
-            libxml2-utils \
-            xsltproc \
-            unzip \
-            fontconfig \
-            python3
+            git openssl procps psmisc tar util-linux \
+            e2fsprogs dosfstools parted multipath-tools \
+            qemu-user-static binfmt-support ccache \
+            python3 python3-pip
 
-      - name: Install repo
+      - name: نصب pmbootstrap از سورس (روش رسمی)
         run: |
-          mkdir -p ~/bin
-          curl https://storage.googleapis.com/git-repo-downloads/repo \
-            -o ~/bin/repo
-          chmod a+x ~/bin/repo
-          echo "$HOME/bin" >> "$GITHUB_PATH"
+          git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          mkdir -p "$HOME/.local/bin"
+          ln -s "$PWD/pmbootstrap/pmbootstrap.py" "$HOME/.local/bin/pmbootstrap"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Initialize LineageOS 19.1
+      - name: کلون pmaports (منبع رسمی بسته‌ها و دستگاه‌ها)
         run: |
-          mkdir -p ~/android
-          cd ~/android
-          repo init \
-            -u https://github.com/LineageOS/android.git \
-            -b lineage-19.1 \
-            --git-lfs
+          git clone --depth=1 --branch "${{ inputs.channel }}" \
+            https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
-      - name: Sync source
+      - name: اعمال پچ‌های اختیاری خودمون روی pmaports
         run: |
-          cd ~/android
-          repo sync \
-            -c \
-            --no-clone-bundle \
-            --no-tags \
-            --optimized-fetch \
-            --prune \
-            -j2
+          PATCH_DIR="workflow-src/${{ inputs.patches_dir }}"
+          if [ -d "$PATCH_DIR" ] && [ -n "$(ls -A "$PATCH_DIR" 2>/dev/null)" ]; then
+            cd pmaports
+            for p in "$GITHUB_WORKSPACE/$PATCH_DIR"/*.patch; do
+              echo ":: applying $p"
+              git apply --verbose "$p"
+            done
+          else
+            echo ":: پوشه‌ی پچ خالیه یا وجود نداره — رد شدیم"
+          fi
 
-      - name: Add Sony device trees
+      - name: تنظیم غیرتعاملی pmbootstrap (بدون ویزارد init)
         run: |
-          cd ~/android
+          export PATH="$HOME/.local/bin:$PATH"
+          pmbootstrap config aports "$GITHUB_WORKSPACE/pmaports"
+          pmbootstrap config device "${{ inputs.device }}"
+          pmbootstrap config ui "${{ inputs.ui }}"
+          pmbootstrap config user user
+          pmbootstrap config hostname "${{ inputs.device }}"
+          pmbootstrap config jobs "$(nproc)"
+          pmbootstrap config ccache_size 5G
+          pmbootstrap status
 
-          git clone --depth=1 \
-            -b lineage-18.1 \
-            https://github.com/LineageOS/android_device_sony_sirius.git \
-            device/sony/sirius
+      # کش کردن work/ باعث میشه رران‌های بعدی خیلی سریع‌تر بشن
+      - name: کش pmbootstrap work dir
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/var/pmbootstrap
+          key: pmb-work-${{ inputs.device }}-${{ inputs.ui }}-${{ github.run_id }}
+          restore-keys: |
+            pmb-work-${{ inputs.device }}-${{ inputs.ui }}-
 
-          git clone --depth=1 \
-            -b lineage-18.1 \
-            https://github.com/LineageOS/android_device_sony_msm8974-common.git \
-            device/sony/msm8974-common
-
-          git clone --depth=1 \
-            -b lineage-18.1 \
-            https://github.com/LineageOS/android_device_sony_shinano-common.git \
-            device/sony/shinano-common
-
-          git clone --depth=1 \
-            -b lineage-18.1 \
-            https://github.com/LineageOS/android_kernel_sony_msm8974.git \
-            kernel/sony/msm8974
-
-      - name: Add Sony dependencies
+      - name: بیلد کرنل downstream دستگاه (اولین قدم مهم و کندتر)
         run: |
-          cd ~/android
+          export PATH="$HOME/.local/bin:$PATH"
+          pmbootstrap -y build linux-postmarketos-qcom-msm8974 --arch=armhf --force
 
-          git clone --depth=1 \
-            -b lineage-18.1 \
-            https://github.com/LineageOS/android_device_sony_common.git \
-            device/sony/common
-
-          git clone --depth=1 \
-            -b lineage-18.1 \
-            https://github.com/LineageOS/android_hardware_sony_thermanager.git \
-            hardware/sony/thermanager
-
-          git clone --depth=1 \
-            -b lineage-19.1 \
-            https://github.com/LineageOS/android_hardware_sony_timekeep.git \
-            hardware/sony/timekeep
-
-          git clone --depth=1 \
-            -b lineage-19.1 \
-            https://github.com/LineageOS/android_hardware_sony_macaddrsetup.git \
-            hardware/sony/macaddrsetup
-
-      - name: Prepare build
+      - name: بیلد بسته‌ی دیوایس sirius
         run: |
-          cd ~/android
-          source build/envsetup.sh
-          lunch lineage_sirius-userdebug
+          export PATH="$HOME/.local/bin:$PATH"
+          pmbootstrap -y build device-${{ inputs.device }} --arch=armhf --force
 
-      - name: Build
+      - name: ساخت ایمیج نهایی (rootfs + kernel + boot.img)
         run: |
-          cd ~/android
-          source build/envsetup.sh
-          lunch lineage_sirius-userdebug
-          m bacon -j2
+          export PATH="$HOME/.local/bin:$PATH"
+          pmbootstrap -y install --password "changeme123" --no-sshd=false
+
+      - name: خروجی گرفتن (export) از فایل‌های نهایی
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          mkdir -p "$GITHUB_WORKSPACE/output"
+          pmbootstrap export "$GITHUB_WORKSPACE/output"
+
+      - name: آپلود artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: postmarketos-${{ inputs.device }}-${{ github.run_number }}
+          path: output/
+          retention-days: 14
+          if-no-files-found: error
