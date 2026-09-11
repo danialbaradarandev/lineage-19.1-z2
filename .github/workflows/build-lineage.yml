@@ -42,15 +42,14 @@ jobs:
 
       - name: نصب pmbootstrap از سورس (روش رسمی)
         run: |
-          git clone --no-depth https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p "$HOME/.local/bin"
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" "$HOME/.local/bin/pmbootstrap"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: کلون pmaports (منبع رسمی بسته‌ها و دستگاه‌ها)
         run: |
-          git clone --depth=1 --branch "${{ inputs.channel }}" \
-            https://gitlab.postmarketos.org/postmarketOS/pmaports.git
+          git clone --no-depth https://gitlab.postmarketos.org/postmarketOS/pmaports.git
 
       - name: اعمال پچ‌های اختیاری خودمون روی pmaports
         run: |
