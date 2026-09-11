@@ -1,72 +1,130 @@
-name: Build LineageOS 19.1 for Xperia Z2
+name: Build LineageOS 19.1 - Sony Xperia Z2
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Free Disk Space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
 
-      - name: Install build dependencies
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          df -h
+
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev libc6-dev-i386 lib32ncurses-dev lib32z1-dev lib32gcc-s1 lib32gcc-12-dev libx11-dev libreadline6-dev libxml2-dev libgl1-mesa-dev libssl-dev libncurses-dev x11proto-core-dev python3 python3-pip openjdk-17-jdk android-sdk-platform-tools adb fastboot bc bison ccache repo cpio pngcrush rsync schedtool squashfs-tools texinfo unzip xsltproc zip zlib1g-dev
+          sudo apt-get install -y \
+            git-core \
+            gnupg \
+            flex \
+            bison \
+            build-essential \
+            zip \
+            curl \
+            zlib1g-dev \
+            libc6-dev-i386 \
+            libncurses5 \
+            x11proto-core-dev \
+            libx11-dev \
+            libreadline-dev \
+            libgl1-mesa-dev \
+            libxml2-utils \
+            xsltproc \
+            unzip \
+            fontconfig \
+            python3
 
-      - name: Configure git
+      - name: Install repo
         run: |
-          git config --global user.name "danialbaradarandev"
-          git config --global user.email "danialbaradaran20@gmail.com"
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo \
+            -o ~/bin/repo
+          chmod a+x ~/bin/repo
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
-      - name: Initialize repo and sync source
+      - name: Initialize LineageOS 19.1
         run: |
-          mkdir -p ~/android/lineage
-          cd ~/android/lineage
-          repo init -u https://github.com/LineageOS/android.git -b lineage-19.1
-          repo sync -c -j8 --force-sync --no-clone-bundle --no-tags --depth=1 --prune
+          mkdir -p ~/android
+          cd ~/android
+          repo init \
+            -u https://github.com/LineageOS/android.git \
+            -b lineage-19.1 \
+            --git-lfs
 
-      - name: Clone device tree, vendor blobs and kernel
+      - name: Sync source
         run: |
-          cd ~/android/lineage
-          # Device Tree (Sirius)
-          git clone https://github.com/LineageOS/android_device_sony_sirius device/sony/sirius || \
-          git clone https://github.com/sonyxperiadev/device-sony-sirius device/sony/sirius
+          cd ~/android
+          repo sync \
+            -c \
+            --no-clone-bundle \
+            --no-tags \
+            --optimized-fetch \
+            --prune \
+            -j2
 
-          # Common Device Tree (Shinano)
-          git clone https://github.com/LineageOS/android_device_sony_shinano-common device/sony/shinano-common || \
-          git clone https://github.com/sonyxperiadev/device-sony-shinano-common device/sony/shinano-common
-
-          # Vendor Blobs (Secure and actively maintained)
-          git clone https://github.com/foric/proprietary_vendor_sony vendor/sony
-
-          # Kernel (msm8974 for Xperia Z2)
-          git clone https://github.com/LineageOS/android_kernel_sony_msm8974 kernel/sony/msm8974 || \
-          git clone https://github.com/sonyxperiadev/kernel-sony-msm8974 kernel/sony/msm8974
-
-      - name: Setup build environment
+      - name: Add Sony device trees
         run: |
-          cd ~/android/lineage
+          cd ~/android
+
+          git clone --depth=1 \
+            -b lineage-18.1 \
+            https://github.com/LineageOS/android_device_sony_sirius.git \
+            device/sony/sirius
+
+          git clone --depth=1 \
+            -b lineage-18.1 \
+            https://github.com/LineageOS/android_device_sony_msm8974-common.git \
+            device/sony/msm8974-common
+
+          git clone --depth=1 \
+            -b lineage-18.1 \
+            https://github.com/LineageOS/android_device_sony_shinano-common.git \
+            device/sony/shinano-common
+
+          git clone --depth=1 \
+            -b lineage-18.1 \
+            https://github.com/LineageOS/android_kernel_sony_msm8974.git \
+            kernel/sony/msm8974
+
+      - name: Add Sony dependencies
+        run: |
+          cd ~/android
+
+          git clone --depth=1 \
+            -b lineage-18.1 \
+            https://github.com/LineageOS/android_device_sony_common.git \
+            device/sony/common
+
+          git clone --depth=1 \
+            -b lineage-18.1 \
+            https://github.com/LineageOS/android_hardware_sony_thermanager.git \
+            hardware/sony/thermanager
+
+          git clone --depth=1 \
+            -b lineage-19.1 \
+            https://github.com/LineageOS/android_hardware_sony_timekeep.git \
+            hardware/sony/timekeep
+
+          git clone --depth=1 \
+            -b lineage-19.1 \
+            https://github.com/LineageOS/android_hardware_sony_macaddrsetup.git \
+            hardware/sony/macaddrsetup
+
+      - name: Prepare build
+        run: |
+          cd ~/android
           source build/envsetup.sh
-          breakfast sirius
           lunch lineage_sirius-userdebug
 
-      - name: Build ROM
+      - name: Build
         run: |
-          cd ~/android/lineage
-          mka bacon
-
-      - name: Upload ROM
-        uses: actions/upload-artifact@v4
-        with:
-          name: lineage-19.1-z2
-          path: ~/android/lineage/out/target/product/sirius/*.zip
+          cd ~/android
+          source build/envsetup.sh
+          lunch lineage_sirius-userdebug
+          m bacon -j2
