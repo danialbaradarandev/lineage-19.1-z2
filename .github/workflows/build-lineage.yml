@@ -41,15 +41,27 @@ jobs:
             python3 python3-pip
 
       - name: نصب pmbootstrap از سورس (روش رسمی)
+        env:
+          GIT_TERMINAL_PROMPT: "0"   # جلوگیری از گیرکردن بی‌صدا روی پرامپت لاگین
         run: |
-          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          set -euxo pipefail
+          git clone --progress --depth=1 \
+            https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git \
+            || git clone --progress --depth=1 \
+                 https://gitlab.com/postmarketOS/pmbootstrap.git pmbootstrap
           mkdir -p "$HOME/.local/bin"
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" "$HOME/.local/bin/pmbootstrap"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: کلون pmaports (منبع رسمی بسته‌ها و دستگاه‌ها)
+        env:
+          GIT_TERMINAL_PROMPT: "0"
         run: |
-          git clone --no-depth https://gitlab.postmarketos.org/postmarketOS/pmaports.git
+          set -euxo pipefail
+          git clone --progress --depth=1 --branch "${{ inputs.channel }}" \
+            https://gitlab.postmarketos.org/postmarketOS/pmaports.git \
+            || git clone --progress --depth=1 --branch "${{ inputs.channel }}" \
+                 https://gitlab.com/postmarketOS/pmaports.git pmaports
 
       - name: اعمال پچ‌های اختیاری خودمون روی pmaports
         run: |
