@@ -42,7 +42,7 @@ jobs:
 
       - name: نصب pmbootstrap از سورس (روش رسمی)
         run: |
-          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
+          git clone --no-depth https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           mkdir -p "$HOME/.local/bin"
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" "$HOME/.local/bin/pmbootstrap"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
