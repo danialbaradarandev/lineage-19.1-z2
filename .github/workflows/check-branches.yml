@@ -1,0 +1,97 @@
+name: Check Xperia Z2 Android 12 Sources
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: System information
+        run: |
+          echo "======================================"
+          echo " SYSTEM"
+          echo "======================================"
+
+          echo
+          echo "CPU:"
+          nproc
+
+          echo
+          echo "RAM:"
+          free -h
+
+          echo
+          echo "DISK:"
+          df -h /
+
+      - name: Check Sirius branches
+        run: |
+          echo "======================================"
+          echo " SIRIUS"
+          echo "======================================"
+
+          git ls-remote --heads \
+            https://github.com/LineageOS/android_device_sony_sirius.git \
+            | grep -E "lineage-(18\.1|19\.1|20|21|22)" || true
+
+      - name: Check Shinano common branches
+        run: |
+          echo "======================================"
+          echo " SHINANO COMMON"
+          echo "======================================"
+
+          git ls-remote --heads \
+            https://github.com/LineageOS/android_device_sony_shinano-common.git \
+            | grep -E "lineage-(18\.1|19\.1|20|21|22)" || true
+
+      - name: Check MSM8974 common branches
+        run: |
+          echo "======================================"
+          echo " MSM8974 COMMON"
+          echo "======================================"
+
+          git ls-remote --heads \
+            https://github.com/LineageOS/android_device_sony_msm8974-common.git \
+            | grep -E "lineage-(18\.1|19\.1|20|21|22)" || true
+
+      - name: Check Sony common branches
+        run: |
+          echo "======================================"
+          echo " SONY COMMON"
+          echo "======================================"
+
+          git ls-remote --heads \
+            https://github.com/LineageOS/android_device_sony_common.git \
+            | grep -E "lineage-(18\.1|19\.1|20|21|22)" || true
+
+      - name: Check Kernel branches
+        run: |
+          echo "======================================"
+          echo " KERNEL"
+          echo "======================================"
+
+          git ls-remote --heads \
+            https://github.com/LineageOS/android_kernel_sony_msm8974.git \
+            | grep -E "lineage-(18\.1|19\.1|20|21|22)" || true
+
+      - name: Check LineageOS Android 12 manifest
+        run: |
+          echo "======================================"
+          echo " LINEAGEOS 19.1"
+          echo "======================================"
+
+          git ls-remote --heads \
+            https://github.com/LineageOS/android.git \
+            | grep "lineage-19.1"
+
+      - name: Final disk
+        run: |
+          echo
+          echo "======================================"
+          echo " FINAL DISK"
+          echo "======================================"
+
+          df -h /
