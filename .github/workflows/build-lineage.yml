@@ -11,10 +11,6 @@ on:
         description: 'رابط کاربری (none / x11 / weston / phosh / plasma-mobile ...)'
         required: true
         default: 'weston'
-      channel:
-        description: 'برنچ pmaports (معمولاً edge)'
-        required: true
-        default: 'master'
       patches_dir:
         description: 'پوشه‌ی پچ‌های اختیاری داخل همین ریپو (خالی = بدون پچ)'
         required: false
@@ -53,40 +49,45 @@ jobs:
           ln -s "$PWD/pmbootstrap/pmbootstrap.py" "$HOME/.local/bin/pmbootstrap"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: کلون pmaports (منبع رسمی بسته‌ها و دستگاه‌ها)
+      - name: init غیرتعاملی pmbootstrap (روش رسمی پروژه برای CI)
         env:
           GIT_TERMINAL_PROMPT: "0"
         run: |
           set -euxo pipefail
-          git clone --progress --depth=1 --branch "${{ inputs.channel }}" \
-            https://gitlab.postmarketos.org/postmarketOS/pmaports.git \
-            || git clone --progress --depth=1 --branch "${{ inputs.channel }}" \
-                 https://gitlab.com/postmarketOS/pmaports.git pmaports
-
-      - name: اعمال پچ‌های اختیاری خودمون روی pmaports
-        run: |
-          PATCH_DIR="workflow-src/${{ inputs.patches_dir }}"
-          if [ -d "$PATCH_DIR" ] && [ -n "$(ls -A "$PATCH_DIR" 2>/dev/null)" ]; then
-            cd pmaports
-            for p in "$GITHUB_WORKSPACE/$PATCH_DIR"/*.patch; do
-              echo ":: applying $p"
-              git apply --verbose "$p"
-            done
-          else
-            echo ":: پوشه‌ی پچ خالیه یا وجود نداره — رد شدیم"
-          fi
-
-      - name: تنظیم غیرتعاملی pmbootstrap (بدون ویزارد init)
-        run: |
           export PATH="$HOME/.local/bin:$PATH"
-          pmbootstrap config aports "$GITHUB_WORKSPACE/pmaports"
+          # روش رسمی پروژه برای init بدون تعامل: enter خالی به همه‌ی سوالات
+          yes "" | pmbootstrap init --shallow-initial-clone
+          pmbootstrap status
+
+      - name: تنظیم device/ui/جاب‌ها روی کانفیگ ساخته‌شده
+        run: |
+          set -euxo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
           pmbootstrap config device "${{ inputs.device }}"
           pmbootstrap config ui "${{ inputs.ui }}"
           pmbootstrap config user user
           pmbootstrap config hostname "${{ inputs.device }}"
           pmbootstrap config jobs "$(nproc)"
           pmbootstrap config ccache_size 5G
-          pmbootstrap status
+          # مسیر واقعی pmaports که خود pmbootstrap کلون کرده رو چاپ کن تا مرحله‌ی بعد ازش استفاده کنه
+          pmbootstrap config aports
+
+      - name: اعمال پچ‌های اختیاری خودمون روی pmaports
+        run: |
+          set -euxo pipefail
+          export PATH="$HOME/.local/bin:$PATH"
+          APORTS_DIR="$(pmbootstrap config aports | tail -n1)"
+          echo "aports path: $APORTS_DIR"
+          PATCH_DIR="$GITHUB_WORKSPACE/workflow-src/${{ inputs.patches_dir }}"
+          if [ -d "$PATCH_DIR" ] && [ -n "$(ls -A "$PATCH_DIR" 2>/dev/null)" ]; then
+            cd "$APORTS_DIR"
+            for p in "$PATCH_DIR"/*.patch; do
+              echo ":: applying $p"
+              git apply --verbose "$p"
+            done
+          else
+            echo ":: پوشه‌ی پچ خالیه یا وجود نداره — رد شدیم"
+          fi
 
       # کش کردن work/ باعث میشه رران‌های بعدی خیلی سریع‌تر بشن
       - name: کش pmbootstrap work dir
@@ -110,7 +111,7 @@ jobs:
       - name: ساخت ایمیج نهایی (rootfs + kernel + boot.img)
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          pmbootstrap -y install --password "changeme123" --no-sshd=false
+          pmbootstrap -y install --password "changeme123"
 
       - name: خروجی گرفتن (export) از فایل‌های نهایی
         run: |
