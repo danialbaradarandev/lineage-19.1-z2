@@ -1,0 +1,85 @@
+name: Check Xperia Z2 Build Environment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show system information
+        run: |
+          echo "===== CPU ====="
+          nproc
+          lscpu | grep -E 'Model name|CPU\(s\)'
+
+          echo
+          echo "===== RAM ====="
+          free -h
+
+          echo
+          echo "===== DISK ====="
+          df -h /
+
+          echo
+          echo "===== OS ====="
+          cat /etc/os-release
+
+      - name: Install repo tool
+        run: |
+          mkdir -p "$HOME/bin"
+          curl https://storage.googleapis.com/git-repo-downloads/repo \
+            -o "$HOME/bin/repo"
+
+          chmod a+x "$HOME/bin/repo"
+
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Check LineageOS 19.1 manifest
+        run: |
+          mkdir -p "$HOME/android/lineage"
+          cd "$HOME/android/lineage"
+
+          repo init \
+            -u https://github.com/LineageOS/android.git \
+            -b lineage-19.1 \
+            --depth=1
+
+          echo
+          echo "===== MANIFEST ====="
+          repo manifest -r | head -50
+
+      - name: Check Xperia Z2 repositories
+        run: |
+          echo "===== Sirius ====="
+          git ls-remote \
+            https://github.com/LineageOS/android_device_sony_sirius.git \
+            HEAD
+
+          echo
+          echo "===== Shinano Common ====="
+          git ls-remote \
+            https://github.com/LineageOS/android_device_sony_shinano-common.git \
+            HEAD
+
+          echo
+          echo "===== MSM8974 Common ====="
+          git ls-remote \
+            https://github.com/LineageOS/android_device_sony_msm8974-common.git \
+            HEAD
+
+          echo
+          echo "===== Kernel ====="
+          git ls-remote \
+            https://github.com/LineageOS/android_kernel_sony_msm8974.git \
+            HEAD
+
+      - name: Final disk check
+        run: |
+          echo "===== FINAL DISK ====="
+          df -h /
+
+          echo
+          echo "===== FINAL MEMORY ====="
+          free -h
